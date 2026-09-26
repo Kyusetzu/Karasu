@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: e362cfb -->
+<!-- generated-through: 52a7cdc -->
 
 ### Fixed
 
@@ -170,6 +170,7 @@ tag time is then optional rather than load-bearing.
 - Open the empty palette on what was used lately, beside the main shortcuts (1.25.22.712).
 - The status button and the +1 buttons carry their colour as a tint instead of a solid fill.
 - Main buttons and chosen chips carry the accent as a tint, and status choices show their own colour everywhere.
+- The overview shows your figures under the banner, one row of what you are watching and reading, and this week beside airing soon.
 
 ### Removed
 

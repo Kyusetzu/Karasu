@@ -597,3 +597,14 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   too narrow for two circles the quick add stays for a new title and the
   editor for a listed one, the status badge giving way. Checkboxes, switches and count badges stay solid: their fill
   is the statement.
+- **2026-09-26:** The overview, chosen in two rounds. Of three arrangements
+  (continue first in one column, two columns with a rail, compact on top)
+  the maintainer took the compact one and asked for three designs of it
+  (panels, a typographic timeline, chips); the panels won, with each figure
+  centred in its own unit. Under the banner sits one panel of four
+  figures, each a tinted glyph over the number and its label; then one row
+  of each continue strip, its count and "Show all" in the header's rule;
+  and this week and airing soon side by side as panels with the heading
+  inside the frame, a hairline between rows and when as a one-line chip.
+  The section header keeps its title whole and lets the meta line give
+  way, where the title used to lose to it ("Die…" on a phone).

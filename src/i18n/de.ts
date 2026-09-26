@@ -368,9 +368,9 @@ export const de: typeof en = {
     upcoming: "Demnächst",
     noUpcoming: "Keine anstehenden Episoden in deiner Liste.",
     thisWeek: "Diese Woche",
-    thisWeekSummary:
-      "{{count}} Episoden aus {{shows}} Serien laufen diese Woche.",
     fullCalendar: "Ganzer Kalender →",
+    showAll: "Alle anzeigen →",
+    episodeCount: "{{count}} Episoden",
     voteUp: "Gute Empfehlung",
     voteDown: "Schlechte Empfehlung",
     voteFailed: "Die Stimme wurde nicht gespeichert",

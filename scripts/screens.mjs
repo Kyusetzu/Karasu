@@ -85,6 +85,8 @@ export const SCREENS = [
   { id: "d15-benachrichtigungen", w: 1232, h: 800, route: "/notifications" },
   { id: "d21-detail", w: 1232, h: 800, route: "/media/178789" },
   { id: "d25-raster-hover", w: 1232, h: 800, route: "/list", act: (p) => p.locator("[data-media-id]").nth(1).hover() },
+  { id: "d26-uebersicht-lang", w: 1232, h: 2600, route: "/" },
+  { id: "p14-uebersicht-lang", w: 405, h: 4200, phone: true, route: "/" },
   { id: "d22-detail-unten", w: 1232, h: 800, route: "/media/178789", act: (p) => p.evaluate(() => document.getElementById("main")?.scrollTo(0, 1e6)) },
   { id: "d23-franchise", w: 1232, h: 800, route: "/franchise/178789" },
   { id: "p12-franchise", w: 405, h: 860, phone: true, route: "/franchise/178789" },

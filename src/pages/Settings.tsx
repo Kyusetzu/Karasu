@@ -47,6 +47,7 @@ import { useAuth } from "@/stores/auth";
 import { usePhoneShell } from "@/hooks/usePhoneShell";
 import { isAndroid, usePlatform } from "@/stores/platform";
 import { Button } from "@/components/ui/button";
+import { CardHeadingLevel } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 
 /** The panes, keyed by URL parameter so deep links land; keep the ids, since renaming one breaks every deep link. */
@@ -147,6 +148,9 @@ function AniListGroup() {
   return <GroupLabel>{t("settings.groupAniList")}</GroupLabel>;
 }
 
+/** The section components that head a group rather than hold settings. */
+const GROUP_LABELS: ReadonlySet<unknown> = new Set([KarasuGroup, AniListGroup]);
+
 function AdvancedWarning() {
   const { t } = useTranslation();
   return <DangerNote title={t("settings.dangerTitle")}>{t("settings.dangerBody")}</DangerNote>;
@@ -185,6 +189,24 @@ export default function Settings() {
     ) : (
       <Section key={i} />
     );
+  // Cards after a group heading sit one level below it, so a screen reader hears the groups as groups.
+  const groupAt = sections.findIndex((S) => GROUP_LABELS.has(S));
+  const rendered = sections.map((S, i) =>
+    groupAt !== -1 && i > groupAt && !GROUP_LABELS.has(S) ? (
+      <CardHeadingLevel.Provider key={i} value={3}>
+        {wrap(S, i)}
+      </CardHeadingLevel.Provider>
+    ) : (
+      wrap(S, i)
+    ),
+  );
+  // Android moves the updater into the account pane and drops the data location, and the list says so.
+  const paneHint = (id: PaneId) =>
+    android && id === "account"
+      ? t("settings.paneHintAndroid_account")
+      : android && id === "advanced"
+        ? t("settings.paneHintAndroid_advanced")
+        : t(`settings.paneHint_${id}`);
 
   /** Master-detail on the phone, keyed on width alone; `?pane=` stays the source of truth, and no param means the list. */
   if (phone) {
@@ -217,7 +239,7 @@ export default function Settings() {
                     <span className={cn("block text-sm font-medium", danger ? "text-danger" : "text-ink-100")}>
                       {t(`settings.pane_${p.id}`)}
                     </span>
-                    <span className="block truncate text-xs text-ink-600">{t(`settings.paneHint_${p.id}`)}</span>
+                    <span className="block truncate text-xs text-ink-600">{paneHint(p.id)}</span>
                   </span>
                   {danger && <AlertTriangle aria-hidden className="size-3.5 shrink-0 text-danger" />}
                   <ChevronRight className="size-4 shrink-0 text-ink-600" />
@@ -235,7 +257,7 @@ export default function Settings() {
             <ChevronLeft className="size-4" />
             {t("settings.title")}
           </Button>
-          {sections.map(wrap)}
+          {rendered}
         </div>
       </div>
     );
@@ -278,7 +300,7 @@ export default function Settings() {
 
       {/* Keyed on the pane so switching replays `settle`; a swap in place looks like the page not reacting. */}
       <div key={active} className="min-w-0 flex-1 animate-settle overflow-y-auto">
-        <div className="mx-auto flex max-w-2xl flex-col gap-6 p-8">{sections.map(wrap)}</div>
+        <div className="mx-auto flex max-w-2xl flex-col gap-6 p-8">{rendered}</div>
       </div>
     </div>
   );

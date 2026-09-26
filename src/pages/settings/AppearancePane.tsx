@@ -335,7 +335,8 @@ function ThemeChoice({ value, onChange }: { value: ThemeMode; onChange: (mode: T
               className={cn(
                 "relative block aspect-4/3 overflow-hidden rounded-control border-2 transition-surface",
                 "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent-500",
-                value === m ? "border-accent-500" : "border-hair group-hover:border-surface-600",
+                "forced-colors:peer-focus-visible:outline-[Highlight]",
+                value === m ? "border-accent-500 forced-colors:border-[Highlight]" : "border-hair group-hover:border-surface-600",
               )}
             >
               {m === "system" ? (
@@ -364,7 +365,11 @@ function ThemeChoice({ value, onChange }: { value: ThemeMode; onChange: (mode: T
 function Miniature({ theme }: { theme: "dark" | "light" }) {
   const dark = theme === "dark";
   return (
-    <span aria-hidden className={cn("absolute inset-0 flex gap-1 p-1.5", dark ? "bg-preview-dark-page" : "bg-preview-light-page")}>
+    <span
+      aria-hidden
+      data-keep-colors
+      className={cn("absolute inset-0 flex gap-1 p-1.5", dark ? "bg-preview-dark-page" : "bg-preview-light-page")}
+    >
       <span className={cn("w-1/5 rounded-inner", dark ? "bg-preview-dark-panel" : "bg-preview-light-panel")} />
       <span className={cn("flex flex-1 flex-col gap-1 rounded-inner p-1.5", dark ? "bg-preview-dark-panel" : "bg-preview-light-panel")}>
         <span className={cn("h-1.5 w-2/3 rounded-full", dark ? "bg-preview-dark-ink/85" : "bg-preview-light-ink/85")} />

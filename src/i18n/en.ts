@@ -1427,6 +1427,8 @@ export const en = {
     paneHint_desktop: "System, updates, Discord",
     paneHint_data: "Queue, export, import, backups",
     paneHint_advanced: "Rescoring, log, where data is kept",
+    paneHintAndroid_account: "Sign-in, lists, profile, notifications, updates",
+    paneHintAndroid_advanced: "Rescoring, log",
     groupKarasu: "In Karasu",
     groupColour: "Colour",
     groupSize: "Size & density",

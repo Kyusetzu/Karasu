@@ -1437,6 +1437,8 @@ export const de: typeof en = {
     paneHint_desktop: "System, Updates, Discord",
     paneHint_data: "Warteschlange, Export, Import, Backups",
     paneHint_advanced: "Neu bewerten, Protokoll, Speicherort",
+    paneHintAndroid_account: "Anmeldung, Listen, Profil, Benachrichtigungen, Updates",
+    paneHintAndroid_advanced: "Neu bewerten, Protokoll",
     groupKarasu: "In Karasu",
     groupColour: "Farbe",
     groupSize: "Größe & Dichte",

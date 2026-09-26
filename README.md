@@ -282,13 +282,13 @@ Captures at 2× on the desktop and straight off the phone — the same set the
   command palette on <kbd>Ctrl</kbd>+<kbd>K</kbd>, <kbd>/</kbd> to search,
   <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>3</kbd> between screens, and arrows,
   <kbd>Space</kbd>, <kbd>E</kbd> and <kbd>C</kbd> inside a list
-- **Settings in eight panes** — account, AniList account, appearance,
-  detection, library, desktop, import & export, and a marked-dangerous
-  advanced pane. The AniList pane edits your *account's* settings in place —
-  title language, score format, activity posting, AniList's own notification
-  toggles — so they apply on anilist.co and in every client at once. On
-  Android the library and desktop panes are hidden, because nothing behind
-  them exists there
+- **Settings in seven panes** — account, appearance, detection, library,
+  desktop, import & export, and a marked-dangerous advanced pane. The account
+  pane holds both halves: what stays in Karasu, and, under *Kept on AniList*,
+  your *account's* own settings edited in place — title language, score
+  format, activity posting, AniList's own notification toggles — so they
+  apply on anilist.co and in every client at once. On Android the library
+  and desktop panes are hidden, because nothing behind them exists there
 - **One interaction model, three presentations**: right-click on a title
   opens a context menu, a long press on the phone opens the same actions as
   a bottom sheet, and the command palette lists them too — update progress,

@@ -1,4 +1,4 @@
-import type { HTMLAttributes } from "react";
+import { createContext, useContext, type HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 /** `raised` stands out of the page, `flat` is a bordered row or block, `sunken` is a well inside either. */
@@ -31,14 +31,13 @@ export function Card({
   );
 }
 
+/** The level a card's title takes: a card under a group heading is one level below it, so the outline reads right. */
+export const CardHeadingLevel = createContext<2 | 3>(2);
+
 export function CardTitle({
   className,
   ...props
 }: HTMLAttributes<HTMLHeadingElement>) {
-  return (
-    <h2
-      className={cn("text-base font-semibold text-ink-100", className)}
-      {...props}
-    />
-  );
+  const Tag = useContext(CardHeadingLevel) === 3 ? "h3" : "h2";
+  return <Tag className={cn("text-base font-semibold text-ink-100", className)} {...props} />;
 }

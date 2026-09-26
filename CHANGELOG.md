@@ -64,7 +64,7 @@ tag time is then optional rather than load-bearing.
 
 ## Unreleased
 
-<!-- generated-through: 2f75b2e -->
+<!-- generated-through: fee96d4 -->
 
 ### Fixed
 
@@ -110,6 +110,7 @@ tag time is then optional rather than load-bearing.
 - The 18+ badge, the complete button and the reveal label on covers are readable in the light theme.
 - The search page no longer starts its second row of chips with a stray divider.
 - A second press on the calendar's next-week arrow no longer jumps back to this week, and the week grid no longer flickers near its width threshold.
+- Settings cards under "In Karasu" and "Kept on AniList" are now announced one level below their group, the phone's pane list names what the Android account and advanced panes really hold, and the chosen theme stays marked in Windows high contrast.
 
 ### Added
 

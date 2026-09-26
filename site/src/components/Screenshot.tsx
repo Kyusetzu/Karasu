@@ -43,8 +43,8 @@ export function Screenshot({
   );
   const phone = shot.kind === "phone";
   const frame = cn(
-    "panel-top overflow-hidden border border-surface-800 bg-surface-900 shadow-[0_1.25rem_2.5rem_rgba(0,0,0,.45)]",
-    phone ? "rounded-[1.75rem]" : "rounded-xl",
+    "panel-top overflow-hidden border border-hair bg-surface-900 shadow-shot",
+    phone ? "rounded-device" : "rounded-panel",
     className,
   );
   if (onClick) {

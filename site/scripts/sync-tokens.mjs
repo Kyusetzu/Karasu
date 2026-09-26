@@ -114,11 +114,39 @@ function taken(head, body = "") {
   return false;
 }
 
+const CONTRAST_ROOT = ':root[data-contrast="more"]';
+
 /** Rewrites a block keyed on the app's contrast attribute into the media query a page without the setting has. */
 function forSite(s) {
-  if (!s.head.startsWith(':root[data-contrast="more"]')) return s;
-  const inner = s.body.replace(':root[data-contrast="more"]', ":root").replace(/^/gm, "  ");
+  if (!s.head.startsWith(CONTRAST_ROOT)) return { ...s, body: nestedContrast(s.body) };
+  const inner = s.body.replaceAll(CONTRAST_ROOT, ":root").replace(/^/gm, "  ");
   return { ...s, body: `@media (prefers-contrast: more) {\n${inner}\n}` };
+}
+
+/**
+ * The same for a rule nested inside another block — a utility's
+ * `:root[data-contrast="more"] & { … }` — which the page answers as
+ * `@media (prefers-contrast: more) { & { … } }` in the same place.
+ */
+function nestedContrast(body) {
+  const marker = `${CONTRAST_ROOT} `;
+  let out = "";
+  let i = 0;
+  for (;;) {
+    const at = body.indexOf(marker, i);
+    if (at === -1) return out + body.slice(i);
+    const open = body.indexOf("{", at);
+    let close = open;
+    for (let depth = 0; close < body.length; close++) {
+      if (body[close] === "{") depth++;
+      else if (body[close] === "}" && --depth === 0) break;
+    }
+    const indent = body.slice(body.lastIndexOf("\n", at) + 1, at);
+    const selector = body.slice(at + marker.length, open).trim();
+    const inner = body.slice(open + 1, close).replace(/\n/g, "\n  ");
+    out += `${body.slice(i, at)}@media (prefers-contrast: more) {\n${indent}  ${selector} {${inner}}\n${indent}}`;
+    i = close + 1;
+  }
 }
 
 function fileUrl(p) {

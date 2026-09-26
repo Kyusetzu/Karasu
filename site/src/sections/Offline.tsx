@@ -42,7 +42,7 @@ export function Offline() {
         {HONEST.map((h, i) => (
           <Reveal key={h.title} delay={staggerDelay(i)}>
             <Card className="h-full">
-              <CardTitle className="text-[.9375rem]">{h.title}</CardTitle>
+              <CardTitle className="text-body">{h.title}</CardTitle>
               <p className="mt-2 text-sm leading-relaxed text-ink-500">{h.text}</p>
             </Card>
           </Reveal>

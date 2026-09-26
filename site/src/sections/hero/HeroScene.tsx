@@ -178,7 +178,7 @@ export function HeroScene({ className }: { className?: string }) {
     <div
       ref={stage}
       data-phase={phase}
-      className="hero-stage relative grid aspect-[16/10] w-full grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden rounded-2xl p-[5%] @max-md:aspect-[6/5] @max-md:gap-2.5"
+      className="hero-stage relative grid aspect-[16/10] w-full grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden rounded-sheet p-[5%] @max-md:aspect-[6/5] @max-md:gap-2.5"
       aria-label="Karasu recognises an episode playing in mpv and updates the list"
       role="img"
     >
@@ -208,7 +208,7 @@ export function HeroScene({ className }: { className?: string }) {
       <div className="flex justify-center @max-md:justify-start">
         <div className="flex h-6 max-w-[80%] items-center gap-2 rounded-full border border-hair bg-surface-900 px-2.5 @max-md:max-w-[72%]">
           <span className="hero-dot size-1.5 shrink-0 rounded-full" />
-          <span className="truncate text-2xs font-medium tracking-[.03em] text-ink-500">
+          <span className="truncate text-2xs font-medium tracking-caption text-ink-500">
             <span className="st st-pill-idle">{COPY.pill.idle}</span>
             <span className="st st-pill-live">{COPY.pill.live}</span>
           </span>
@@ -242,7 +242,7 @@ export function HeroScene({ className }: { className?: string }) {
       <div className="flex justify-end">
         {/* 17.5rem at the least: the eyebrow, the chip and the title all have to fit
             beside the disc, and at 15rem the stage of a 1024px window cut both. */}
-        <div className="hero-card relative w-[58%] min-w-70 max-w-96 rounded-[.875rem] px-4.5 py-4 inset-well well-edge @max-md:w-full @max-md:min-w-0 @max-md:max-w-none @max-md:px-3.5 @max-md:py-3">
+        <div className="hero-card relative w-[58%] min-w-70 max-w-96 rounded-panel px-4.5 py-4 inset-well well-edge @max-md:w-full @max-md:min-w-0 @max-md:max-w-none @max-md:px-3.5 @max-md:py-3">
           <div className="flex items-start gap-3">
             <div ref={disc} className="relative grid size-11 shrink-0 place-items-center rounded-full bg-accent-600/25 text-accent-400">
               <MonitorPlay className="size-5" aria-hidden="true" />
@@ -254,18 +254,18 @@ export function HeroScene({ className }: { className?: string }) {
             <div className="min-w-0 flex-1">
               {/* The chip shares the eyebrow's line, so the title keeps the card's whole width. */}
               <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-2xs uppercase tracking-[.09em] text-ink-600">
+                <p className="truncate text-2xs uppercase tracking-eyebrow text-ink-600">
                   <span className="st st-eyebrow-idle">{COPY.eyebrow.idle}</span>
                   <span className="st st-eyebrow-live">{COPY.eyebrow.live}</span>
                 </p>
                 <span
                   ref={chip}
-                  className="hero-chip shrink-0 rounded-[.625rem] border border-success/40 bg-success/10 px-2 py-0.5 font-brand text-2xs font-semibold uppercase tracking-[.16em] text-success"
+                  className="hero-chip shrink-0 rounded-inner border border-success/45 px-2 py-0.5 font-brand text-2xs font-semibold uppercase tracking-eyebrow text-success"
                 >
                   {COPY.chip}
                 </span>
               </div>
-              <p className="truncate text-[1.0625rem] font-semibold text-ink-100 @max-xl:text-[.9375rem]">
+              <p className="truncate text-base font-semibold text-ink-100 @max-xl:text-body">
                 {COPY.title} <span className="text-ink-500">— {COPY.episode}</span>
               </p>
               <p className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-xs text-ink-500">
@@ -292,7 +292,7 @@ export function HeroScene({ className }: { className?: string }) {
         type="button"
         onClick={play}
         className={cn(
-          "absolute bottom-[5%] left-[5%] z-20 inline-flex h-7.5 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-ink-500 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500 @max-md:bottom-auto @max-md:left-auto @max-md:right-[5%] @max-md:top-[5%]",
+          "absolute bottom-[5%] left-[5%] z-20 inline-flex h-7.5 items-center gap-1.5 rounded-control px-2.5 text-xs font-medium text-ink-500 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500 @max-md:bottom-auto @max-md:left-auto @max-md:right-[5%] @max-md:top-[5%]",
           phase === "done" ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         aria-hidden={phase !== "done"}

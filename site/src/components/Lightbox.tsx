@@ -95,7 +95,7 @@ export function Lightbox({
       aria-modal="true"
       aria-label={`Screenshot ${index + 1} of ${shots.length}: ${shot.caption}`}
       className={cn(
-        "fixed inset-0 z-50 grid place-items-center bg-[rgba(4,5,8,.82)] p-4 md:p-8",
+        "fixed inset-0 z-50 grid place-items-center bg-scrim-deep p-4 md:p-8",
         leaving ? "animate-fade-out" : "animate-fade-in",
       )}
       onClick={(e) => {
@@ -123,7 +123,7 @@ export function Lightbox({
         )}
       >
         <figure className="min-h-0">
-          <div className="panel-top overflow-hidden rounded-xl border border-surface-800 bg-surface-900 shadow-[0_1.5rem_4rem_rgba(0,0,0,.8)]">
+          <div className="panel-top overflow-hidden rounded-panel border border-hair bg-surface-900 shadow-sheet">
             <picture>
               <source type="image/avif" srcSet={shot.avif.map((s) => `${s.src} ${s.w}w`).join(", ")} sizes="100vw" />
               <source type="image/webp" srcSet={shot.webp.map((s) => `${s.src} ${s.w}w`).join(", ")} sizes="100vw" />
@@ -148,7 +148,7 @@ export function Lightbox({
             type="button"
             onClick={prev}
             aria-label="Previous screenshot"
-            className="grid size-9 place-items-center rounded-md text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
+            className="grid size-9 place-items-center rounded-control text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
           >
             <ChevronLeft className="size-5" aria-hidden="true" />
           </button>
@@ -156,7 +156,7 @@ export function Lightbox({
             type="button"
             onClick={next}
             aria-label="Next screenshot"
-            className="grid size-9 place-items-center rounded-md text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
+            className="grid size-9 place-items-center rounded-control text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
           >
             <ChevronRight className="size-5" aria-hidden="true" />
           </button>
@@ -165,7 +165,7 @@ export function Lightbox({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="grid size-9 place-items-center rounded-md text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
+            className="grid size-9 place-items-center rounded-control text-ink-300 transition-surface hover:bg-surface-850 hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
           >
             <X className="size-5" aria-hidden="true" />
           </button>

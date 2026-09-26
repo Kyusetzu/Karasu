@@ -37,15 +37,15 @@ function PresenceMock() {
           <Tv className="size-5" aria-hidden="true" />
         </span>
         <div className="min-w-0">
-          <p className="text-2xs font-semibold uppercase tracking-[.12em] text-ink-600">Playing Karasu</p>
+          <Eyebrow tone="muted">Playing Karasu</Eyebrow>
           <p className="truncate text-sm font-semibold text-ink-100">Anime Title</p>
           <p className="text-xs text-ink-500">Episode 4 / 12 · Watching</p>
           <p className="mt-0.5 text-2xs tabular-nums text-ink-600">18:32 left</p>
         </div>
       </div>
       <div className="mt-4 flex gap-2">
-        <span className="flex-1 rounded-lg border border-surface-700 px-3 py-1.5 text-center text-xs text-ink-300">Get Karasu here</span>
-        <span className="flex-1 rounded-lg border border-surface-700 px-3 py-1.5 text-center text-xs text-ink-300">View on AniList</span>
+        <span className="flex-1 rounded-control border border-surface-700 px-3 py-1.5 text-center text-xs text-ink-300">Get Karasu here</span>
+        <span className="flex-1 rounded-control border border-surface-700 px-3 py-1.5 text-center text-xs text-ink-300">View on AniList</span>
       </div>
     </Card>
   );
@@ -147,10 +147,10 @@ function FeatureRow({ row, flip }: { row: Row; flip: boolean }) {
       <div className={cn(flip && "lg:order-2")}>{row.media}</div>
       <div className={cn(flip && "lg:order-1")}>
         <Eyebrow>{row.eyebrow}</Eyebrow>
-        <h3 className="mt-3 font-brand text-2xl font-bold leading-[1.15] tracking-[-.02em] text-ink-100">
+        <h3 className="mt-3 font-brand text-h3 font-bold text-ink-100">
           {row.title}
         </h3>
-        <p className="mt-4 text-[.9375rem] leading-relaxed text-ink-300">{row.text}</p>
+        <p className="mt-4 text-body leading-relaxed text-ink-300">{row.text}</p>
         {row.bullets && (
           <ul className="mt-5 space-y-2">
             {row.bullets.map((b) => (

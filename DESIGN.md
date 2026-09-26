@@ -313,7 +313,9 @@ Windows' forced colours stay separate: the OS replaces the palette, and
 
 The website stays dark. The token sync rewrites the dark high-contrast
 blocks into `@media (prefers-contrast: more)`, so the site answers the OS
-request directly.
+request directly — the top-level blocks and the rules nested inside a
+utility alike. The site's own light (its washes, the feathers, the hero
+stage's glow and the screenshot shadows) goes under the same query.
 
 **Known gap:** grey data fills stand under 3 : 1 in high-contrast light, and
 the score histogram's upper bars are one of them. They get the border role
@@ -669,3 +671,11 @@ maintainer picks. A pure restyle that moves nothing does not. The rules:
   lenses above it staying chips. The composer's toolbar keeps one row: the
   six marks used most (bold, italic, strike, spoiler, link, image), a
   "More" menu holding the rest, and Preview at the end.
+- **2026-09-26:** The website takes the app's vocabulary, shown as before
+  and after in both contrasts. Its copied button, card and pill match the
+  app's; radii go by role, with a device corner for the phone screenshot;
+  one eyebrow, in the accent over a section and muted over a group; chips
+  outlined on the inner radius, as the app's are; panel edges on the hair
+  line; shadows and the lightbox scrim from tokens; the feathers take
+  their colours from the accent. The download button is the app's main
+  action, the accent as a tint, rather than a solid fill of its own.

@@ -2,6 +2,7 @@ import { ScrollText, MonitorSmartphone, UserRoundX } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { LINKS } from "@/site.config";
 import { HeroScene } from "./hero/HeroScene";
+import { Eyebrow } from "@/components/Section";
 
 const FACTS = [
   { icon: MonitorSmartphone, text: "Windows · Linux · Android" },
@@ -14,9 +15,7 @@ export function Hero() {
     <section id="top" aria-labelledby="hero-title" className="hero relative overflow-hidden">
       <div className="container-site grid items-center gap-12 px-5 pb-20 pt-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-10 lg:pb-28 lg:pt-24 2xl:gap-16 2xl:pb-32 2xl:pt-28">
         <div className="relative">
-          <p className="font-brand text-2xs font-semibold uppercase tracking-[.18em] text-accent-400">
-            Free · open source · built for AniList
-          </p>
+          <Eyebrow>Free · open source · built for AniList</Eyebrow>
           <h1 id="hero-title" className="mt-4 font-brand text-display font-bold text-ink-100">
             A modern anime &amp; manga tracker, built exclusively for AniList.
           </h1>

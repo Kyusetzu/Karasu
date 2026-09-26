@@ -29,13 +29,13 @@ export function Platforms() {
           <Reveal key={p.id} delay={staggerDelay(i)}>
             <Card className="flex h-full flex-col">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="font-brand text-xl font-bold tracking-[-.01em] text-ink-100">{p.name}</h3>
+                <h3 className="font-brand text-xl font-bold text-ink-100">{p.name}</h3>
                 <span
                   className={cn(
-                    "rounded-[.625rem] border px-2 py-0.5 font-brand text-2xs font-semibold uppercase tracking-[.14em]",
+                    "rounded-inner border px-2 py-0.5 font-brand text-2xs font-semibold uppercase tracking-eyebrow",
                     p.tier === "stable"
-                      ? "border-success/40 bg-success/10 text-success"
-                      : "border-gold/40 bg-gold/10 text-gold",
+                      ? "border-success/45 text-success"
+                      : "border-gold/45 text-gold",
                   )}
                 >
                   {TIERS[p.tier].label}

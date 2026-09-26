@@ -1,5 +1,6 @@
 import KarasuMark from "@/components/KarasuMark";
 import { LINKS } from "@/site.config";
+import { Eyebrow } from "@/components/Section";
 
 const COLUMNS = [
   {
@@ -37,26 +38,26 @@ export function Footer() {
       <div className="container-site px-5 py-14">
         <div className="grid gap-10 md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
           <div>
-            <a href="#top" className="inline-flex items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-accent-500">
+            <a href="#top" className="inline-flex items-center gap-2.5 rounded-control focus-visible:outline-2 focus-visible:outline-accent-500">
               <KarasuMark className="size-7" />
-              <span className="font-brand text-xs font-semibold tracking-[.2em] text-ink-300">KARASU</span>
+              <span className="font-brand text-xs font-semibold tracking-wordmark text-ink-300">KARASU</span>
             </a>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-500">
               A modern anime &amp; manga tracker — built exclusively for AniList.
             </p>
-            <p className="mt-4 text-2xs uppercase tracking-[.12em] text-ink-600">
+            <p className="mt-4 text-2xs uppercase tracking-eyebrow text-ink-600">
               Open source · free of cost
             </p>
           </div>
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <p className="text-2xs font-semibold uppercase tracking-[.16em] text-ink-600">{col.title}</p>
+              <Eyebrow tone="muted">{col.title}</Eyebrow>
               <ul className="mt-3 space-y-2">
                 {col.links.map((l) => (
                   <li key={l.label}>
                     <a
                       href={l.href}
-                      className="rounded text-sm text-ink-300 transition-surface hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
+                      className="rounded-inner text-sm text-ink-300 transition-surface hover:text-ink-100 focus-visible:outline-2 focus-visible:outline-accent-500"
                     >
                       {l.label}
                     </a>

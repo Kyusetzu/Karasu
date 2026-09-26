@@ -37,7 +37,38 @@
   --text-cta--letter-spacing: -0.03em;
   --text-lede: clamp(1rem, 0.94rem + 0.2vw, 1.125rem);
   --text-lede--line-height: 1.6;
+
+  /* The page's reading step between the app's `text-sm` and `text-base`: a
+     card's title, a list item, an answer. No line height of its own, so it
+     takes whatever the block it sits in reads at. */
+  --text-body: 0.9375rem;
+  /* A sub-section's heading, below `text-h2`. */
+  --text-h3: 1.5rem;
+  --text-h3--line-height: 1.15;
+  --text-h3--letter-spacing: -0.02em;
+
+  /* The hero stage's ground: the Wrapped poster's, a step below the page
+     (POSTER_BG in src/pages/Wrapped.tsx), so the stage reads as a well. */
+  --color-stage: #07090d;
+
+  /* The phone screenshot's bezel: a device corner, not a panel's. */
+  --radius-device: 1.75rem;
+
+  /* A screenshot sits on the page as a photograph does, with a longer and
+     softer shadow than a floating panel's; lifted a little further under the
+     pointer. Transparent under high contrast, like the app's float shadow. */
+  --shadow-shot: 0 1.25rem 2.5rem var(--shot-shadow);
+  --shadow-shot-lift: 0 1.5rem 3rem var(--shot-shadow-lift);
 }
+
+:root {
+  --shot-shadow: rgb(0 0 0 / 0.45);
+  --shot-shadow-lift: rgb(0 0 0 / 0.55);
+}
+
+/* The app's touch variant: a small control answers taps across 44 px where
+   the pointer is a finger (`hit-area` in the generated tokens). */
+@custom-variant coarse (@media (pointer: coarse));
 
 /* The page's column: 72rem, and 80rem on a screen wide enough that 72 reads
    as a strip down the middle. One utility so the nav, the hero, the strip,
@@ -76,7 +107,7 @@ body {
   @apply sr-only;
 }
 .skip-link:focus-visible {
-  @apply not-sr-only fixed left-4 top-4 z-50 rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-accent-ink outline-none;
+  @apply not-sr-only fixed left-4 top-4 z-50 rounded-control bg-accent-500 px-3 py-2 text-sm font-medium text-accent-ink outline-none;
 }
 
 /* --- Feathers ----------------------------------------------------------- */
@@ -156,7 +187,7 @@ body {
 }
 .shot-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 1.5rem 3rem rgba(0, 0, 0, 0.55);
+  box-shadow: var(--shadow-shot-lift);
 }
 
 /* --- FAQ ---------------------------------------------------------------- */
@@ -205,10 +236,10 @@ body {
     radial-gradient(90% 90% at 0% 0%, rgba(var(--w1), 0.16), transparent 60%),
     radial-gradient(70% 70% at 100% 100%, rgba(var(--accent-rgb), 0.13), transparent 60%),
     radial-gradient(60% 60% at 50% 45%, rgba(var(--w2), 0.07), transparent 65%),
-    #07090d;
+    var(--color-stage);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 1.25rem 2.5rem rgba(0, 0, 0, 0.45);
+    var(--shadow-shot);
 }
 
 .hero-dot {
@@ -372,4 +403,27 @@ body {
   height: 26rem;
   pointer-events: none;
   background: radial-gradient(40rem 20rem at 50% 120%, rgba(var(--accent-rgb), 0.14), transparent 70%);
+}
+
+/* --- High contrast ------------------------------------------------------ */
+
+/* The generated tokens already swap the palette and drop the float shadow
+   and catch-light. What is the site's own goes the same way: the washes and
+   the feathers are light and colour behind text, which no contrast ratio can
+   promise, and the stage becomes a panel with an edge. */
+@media (prefers-contrast: more) {
+  :root {
+    --shot-shadow: transparent;
+    --shot-shadow-lift: transparent;
+  }
+  .feathers,
+  .wash::before,
+  .hero::before,
+  .cta::before {
+    display: none;
+  }
+  .hero-stage {
+    background: var(--color-surface-900);
+    box-shadow: inset 0 0 0 1px var(--color-surface-600);
+  }
 }

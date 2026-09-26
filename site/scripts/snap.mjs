@@ -13,6 +13,7 @@
  *   --clip <selector>                 capture only that element
  *   --frames 0,500,1000               one capture per delay (ms) after load, for a timeline
  *   --reduced                         emulate prefers-reduced-motion: reduce
+ *   --contrast                        emulate prefers-contrast: more
  *   --scale 2                         device scale factor (default 2 below 768 px, else 1)
  *
  * A URL's `#hash` is kept, so `#sample` reaches the dev-only sample page.
@@ -46,6 +47,7 @@ const name = opts["--out"] ?? "page";
 const full = Boolean(opts["--full"]);
 const clip = opts["--clip"];
 const reduced = Boolean(opts["--reduced"]);
+const contrast = Boolean(opts["--contrast"]);
 
 if (!urls.length) {
   console.error("snap: give at least one URL");
@@ -68,6 +70,7 @@ try {
         deviceScaleFactor: scale,
         colorScheme: "dark",
         reducedMotion: reduced ? "reduce" : "no-preference",
+        contrast: contrast ? "more" : "no-preference",
       });
       const page = await context.newPage();
       await page.goto(url, { waitUntil: "networkidle" });
@@ -99,7 +102,7 @@ try {
           await page.waitForTimeout(Math.max(0, at - elapsed));
           elapsed = at;
         }
-        const tag = `${name}-${width}${reduced ? "-reduced" : ""}${at === null ? "" : `-t${at}`}${full ? "-full" : ""}.png`;
+        const tag = `${name}-${width}${reduced ? "-reduced" : ""}${contrast ? "-contrast" : ""}${at === null ? "" : `-t${at}`}${full ? "-full" : ""}.png`;
         const file = path.join(OUT, tag);
         if (clip) {
           const el = page.locator(clip).first();

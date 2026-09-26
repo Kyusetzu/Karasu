@@ -43,7 +43,7 @@ export function FlowDiagram({
             <Icon className="size-5" aria-hidden="true" />
           </span>
           <div className="min-w-0 pt-2 md:pt-0">
-            <p className="font-brand text-[.9375rem] font-semibold text-ink-100">
+            <p className="font-brand text-body font-semibold text-ink-100">
               <span className="mr-1.5 text-2xs tabular-nums text-ink-600">{String(i + 1).padStart(2, "0")}</span>
               {title}
             </p>

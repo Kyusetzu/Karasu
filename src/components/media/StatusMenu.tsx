@@ -94,7 +94,7 @@ export function StatusMenu({
   useEffect(() => {
     if (!entry || !refocus.current) return;
     refocus.current = false;
-    if (!document.activeElement || document.activeElement === document.body) trigger.current?.focus();
+    if (!document.activeElement || document.activeElement === document.body) trigger.current?.focus({ preventScroll: true });
   }, [entry]);
 
   const choose = (status: MediaListStatus) => {
@@ -104,7 +104,7 @@ export function StatusMenu({
 
   const sheet = variant === "sheet";
   const box = sheet ? "h-11 w-full rounded-panel text-sm" : "h-9 rounded-control text-sm";
-  const ring = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 disabled:opacity-60";
+  const ring = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 aria-disabled:opacity-60";
   const defaultStatus = loadDefaultAddStatus();
   const defaultLabel = t(`status.${media.type}.${defaultStatus}`);
   return (
@@ -136,10 +136,15 @@ export function StatusMenu({
                 onClick={(e) => {
                   if (add.isPending) return;
                   refocus.current = document.activeElement === e.currentTarget;
-                  add.mutate(defaultStatus, { onError: () => (refocus.current = false) });
+                  // Settled without an entry, as a queued add is, the hand-over is off rather than waiting for a later one.
+                  add.mutate(defaultStatus, {
+                    onSettled: () => {
+                      if (!qc.getQueryData<MediaDetail>(key)?.mediaListEntry) refocus.current = false;
+                    },
+                  });
                 }}
                 title={t("detail.addAsDefault", { status: defaultLabel })}
-                className={cn("flex min-w-0 flex-1 items-center gap-2 pl-3.5 pr-2 aria-disabled:opacity-60", ring)}
+                className={cn("flex min-w-0 flex-1 items-center gap-2 pl-3.5 pr-2", ring)}
               >
                 <Plus aria-hidden className="size-4 shrink-0" />
                 <span className="truncate">{t("detail.addToList")}</span>
@@ -155,7 +160,9 @@ export function StatusMenu({
               p.ref.current = el;
               trigger.current = el;
             }}
-            disabled={!entry && add.isPending}
+            // Held rather than disabled while the add is out, so a panel closing on it can still hand focus back.
+            aria-disabled={!entry && add.isPending ? true : undefined}
+            onClick={!entry && add.isPending ? undefined : p.onClick}
             aria-label={entry ? undefined : t("detail.chooseStatus")}
             title={entry ? t("actions.changeStatus") : t("detail.chooseStatus")}
             className={cn(

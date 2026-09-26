@@ -210,6 +210,44 @@ describe("StatusMenu", () => {
     await waitFor(() => expect(screen.getByTitle("actions.changeStatus")).toHaveFocus());
   });
 
+  /** Closed while its add is still out, the chooser hands focus to the chevron, which then becomes the status button. */
+  it("keeps focus on the chevron when the chooser closes before its add lands", async () => {
+    for (const variant of ["sheet", "dropdown"] as const) {
+      let land: (r: MutationResult) => void = () => {};
+      save.mockImplementation(() => new Promise<MutationResult>((r) => (land = r)));
+      mount(offList, variant);
+      const user = userEvent.setup({ delay: null });
+      screen.getByTitle("detail.chooseStatus").focus();
+      await user.keyboard("{Enter}");
+      const panel = await screen.findByRole("dialog");
+      within(panel).getByRole("button", { name: "status.ANIME.CURRENT" }).focus();
+      await user.keyboard("{Enter}");
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await waitFor(() => expect(screen.getByTitle("detail.chooseStatus")).toHaveFocus());
+      await act(async () => land(echo({ status: "CURRENT", progress: 0 })));
+      await waitFor(() => expect(screen.getByTitle("actions.changeStatus")).toHaveFocus());
+      cleanup();
+    }
+  });
+
+  /** A queued add names no entry, so the hand-over is dropped rather than firing whenever one turns up later. */
+  it("takes no focus later when the one-press add was only queued", async () => {
+    save.mockResolvedValue({ queued: true, entry: null } as unknown as MutationResult);
+    const { queryClient } = mount(offList, "dropdown");
+    const user = userEvent.setup({ delay: null });
+    screen.getByRole("button", { name: "detail.addToList" }).focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole("button", { name: "detail.addToList" })).not.toHaveAttribute("aria-disabled", "true"));
+    act(() => (document.activeElement as HTMLElement).blur());
+    act(() => {
+      queryClient.setQueryData(["mediaDetail", 42], { ...offList, mediaListEntry: media.mediaListEntry });
+    });
+    expect(await screen.findByTitle("actions.changeStatus")).toBeInTheDocument();
+    expect(document.body).toHaveFocus();
+  });
+
   /** Working in a panel the mouse opened makes it a pressed one: leaving keeps it, and closing hands focus back. */
   it("keeps a hover-opened choice once it is used, and returns focus from it", async () => {
     save.mockResolvedValue(echo({ status: "CURRENT", progress: 0 }));
